@@ -1,7 +1,7 @@
-// Modified Version of GatherData.cpp 
-// By: 
+// Modified Version of GatherData.cpp
+// By:
 // Howard University Terminator Arm Senior Design 2015/2016.
-// 
+//
 
 // Dependencies:
 // 1. MyoConnect
@@ -11,10 +11,10 @@
 // This is used for testing/Demo with Calibration. The rest of the code for the project is separate from this.
 // EMG streaming is only supported for one Myo at a time
 // Terminator Myo MAC address: db-fa-0c-69-14-78 (Can be used alternatively instead of MyoConnect to attach our Myo to a Hub)
-// http://diagnostics.myo.com/ provides diagnostic data of Myo (connected in MyoConnect) on a pc 
+// http://diagnostics.myo.com/ provides diagnostic data of Myo (connected in MyoConnect) on a pc
 // Notes:
 // The Myo armband will go into sleep mode if it's not synced and sits idle for a short period of time. You can't turn that off here. (just keep it synced!)
-// 
+//
 // NB: Replacing system("cls") is advised.
 
 
@@ -36,238 +36,1220 @@
 // DataCollector class inheriting member functions from myo::DeviceListener
 class DataCollector : public myo::DeviceListener {
 public:
-	DataCollector() : onArm(false), emgSamples()
-	{}
+    DataCollector() : onArm(false), emgSamples()
+    {}
+    
+    // onArmSync() is called whenever HUTerminator Myo recognizes a Sync Gesture after someone has put it on their
+    // arm. This lets Myo know which arm it's on and which way it's facing.
+    void onArmSync(myo::Myo* myo, uint64_t timestamp, myo::Arm arm, myo::XDirection xDirection, float rotation,
+                   myo::WarmupState warmupState)
+    {
+        system("cls"); std::cout << "On ARM SYNC CALLED!!" << std::endl;
+        onArm = true;
+        whichArm = arm;
+    }
+    // onArmUnsync() is called whenever HUTerminator Myo has detected that it was moved from a stable position on a person's arm after
+    // it recognized the arm. Typically this happens when someone takes it off of their arm, but it can also happen
+    // when the Myo is moved around on the arm.
+    void onArmUnsync(myo::Myo* myo, uint64_t timestamp)
+    {
+        system("cls"); std::cout << "On ARM UN-SYNC CALLED!!" << std::endl;
+        onArm = false;
+        Sleep(5000);
+    }
+    
+    // onUnpair() is called whenever the Myo is disconnected from Myo Connect by the user
+    void onUnpair(myo::Myo* myo, uint64_t timestamp)
+    {
+        // We've lost our Myo.
+        // Zeros are seen in output file if there was a disconnect so test can be repeated
+        emgSamples.fill(0);
+        onArm = false;
+    }
+    
+    // onEmgData() is called whenever a paired Myo has provided new EMG data, and EMG streaming is enabled
+    // Classifier output data
+    void onEmgData(myo::Myo* myo, uint64_t timestamp, const int8_t* emg)
+    {
+        for (int i = 0; i < 8; i++) {
+            emgSamples[i] = emg[i];
+        }
+    }
+    
+    // The values of this array is set by onEmgData() above
+    std::array<int8_t, 8> emgSamples;
+    bool onArm; myo::Arm whichArm;
+    
+    // There are other virtual functions in DeviceListener that we could override here, like onAccelerometerData()
+    // For this application, the functions overridden above are sufficient
+    std::string SerialIndex, update = "gesture";
+    std::ofstream TerminatorFile;
+    std::string filepath = "C:\\Users\\Ayotunde\\Google Drive\\Team Terminator\\Data Analysis\\EMGClassifierData\\TeamTerminatorData";
+    int NewLineflag = 0;
+    
+    // We define this function to write the current values that were updated by the on...() functions above
+    void writeData(std::string gesture)
+    {
+        // Create and open dynamic outfile
+        std::string filename = filepath + SerialIndex + ".txt";
+        TerminatorFile.open(filename, std::ofstream::app);
+        
+        // Write current gesture to outfile
+        if (update != gesture){
+            TerminatorFile << "\n" << gesture << "\n"; update = gesture;
+        }
+        
+        // Clear the current line
+        std::cout << '\r';
+        // write out the EMG classifier data
+        for (size_t i = 0; i < emgSamples.size(); i++) {
+            std::ostringstream oss;
+            oss << static_cast<int>(emgSamples[i]);        // convert 8-bit array into int
+            std::string emgString = oss.str();
+            
+            if (NewLineflag == 1){
+                TerminatorFile << "\n";
+                NewLineflag = 0;
+            }
+            
+            // Write to outfile
+            TerminatorFile << emgString << " ";
+        }
+        NewLineflag = 1;
+        std::cout << std::flush;
+        TerminatorFile.close();       // flush buffer to outfile
+    }
+    
+    // We define this function to calibrate our logged data
+    void calibrateData(){
+        system("cls"); std::cout << "\t\t Calibrating logged Data..." << std::endl;
+        int restCalIN_array[8] = [0,0,0,0,0,0,0,0];
+        int restCal_array1[180] = { };
+        int restCal_array2[180] = { };
+        int restCal_array3[180] = { };
+        int restCal_array4[180] = { };
+        int restCal_array5[180] = { };
+        int restCal_array6[180] = { };
+        int restCal_array7[180] = { };
+        int restCal_array8[180] = { };
+        
+        int thumbCalIN_array[8] = [0,0,0,0,0,0,0,0];
+        int thumbCal_array1[30] = { };
+        int thumbCal_array2[30] = { };
+        int thumbCal_array3[30] = { };
+        int thumbCal_array4[30] = { };
+        int thumbCal_array5[30] = { };
+        int thumbCal_array6[30] = { };
+        int thumbCal_array7[30] = { };
+        int thumbCal_array8[30] = { };
+        
+        int indexCalIN_array[8] = [0,0,0,0,0,0,0,0];
+        int indexCal_array1[30] = { };
+        int indexCal_array2[30] = { };
+        int indexCal_array3[30] = { };
+        int indexCal_array4[30] = { };
+        int indexCal_array5[30] = { };
+        int indexCal_array6[30] = { };
+        int indexCal_array7[30] = { };
+        int indexCal_array8[30] = { };
+        
+        int middleCalIN_array[8] = [0,0,0,0,0,0,0,0];
+        int middleCal_array1[30] = { };
+        int middleCal_array2[30] = { };
+        int middleCal_array3[30] = { };
+        int middleCal_array4[30] = { };
+        int middleCal_array5[30] = { };
+        int middleCal_array6[30] = { };
+        int middleCal_array7[30] = { };
+        int middleCal_array8[30] = { };
+        
+        int ringCalIN_array[8] = [0,0,0,0,0,0,0,0];
+        int ringCal_array1[30] = { };
+        int ringCal_array2[30] = { };
+        int ringCal_array3[30] = { };
+        int ringCal_array4[30] = { };
+        int ringCal_array5[30] = { };
+        int ringCal_array6[30] = { };
+        int ringCal_array7[30] = { };
+        int ringCal_array8[30] = { };
+        
+        int pinkyCalIN_array[8] = [0,0,0,0,0,0,0,0];
+        int pinkyCal_array1[30] = { };
+        int pinkyCal_array2[30] = { };
+        int pinkyCal_array3[30] = { };
+        int pinkyCal_array4[30] = { };
+        int pinkyCal_array5[30] = { };
+        int pinkyCal_array6[30] = { };
+        int pinkyCal_array7[30] = { };
+        int pinkyCal_array8[30] = { };
+        
+        int handCalIN_array[8] = [0,0,0,0,0,0,0,0];
+        int handCal_array1[30] = { };
+        int handCal_array2[30] = { };
+        int handCal_array3[30] = { };
+        int handCal_array4[30] = { };
+        int handCal_array5[30] = { };
+        int handCal_array6[30] = { };
+        int handCal_array7[30] = { };
+        int handCal_array8[30] = { };
+        
+        // Read from outfile
+        
+        TerminatorFile.open(filename, std::ofstream::app);
+        for (int i = 0; i < 2; i++)
+        {
+            string tmp;
+            myfile >> tmp;
+        }
+        for(int i = 0; i < 30; i++)
+        {
+            TerminatorFile >> restCal_array1[i] >>restCal_array2[i] >> restCal_array3[i] >> restCal_array4[i]
+            >> restCal_array5[i] >> restCal_array6[i] >> restCal_array7[i] >> restCal_array8[i];
+        }
+        for (int i = 0; i < 2; i++)
+        {
+            myfile >> tmp;
+        }
+        for(int i = 0; i < 30; i++)
+        {
+            TerminatorFile >> thumbCal_array1[i] >> thumbCal_array2[i] >> thumbCal_array3[i] >> thumbCal_array4[i]
+            >>  thumbCal_array5[i] >> thumbCal_array6[i] >> thumbCal_array7[i] >> thumbCal_array8[i];
+        }
+        for (int i = 0; i < 2; i++)
+        {
+            myfile >> tmp;
+        }
+        for(int i = 30; i < 60; i++)
+        {
+            TerminatorFile >> restCal_array1[i] >>restCal_array2[i] >> restCal_array3[i] >> restCal_array4[i]
+            >> restCal_array5[i] >> restCal_array6[i] >> restCal_array7[i] >> restCal_array8[i];
+        }
+        for (int i = 0; i < 2; i++)
+        {
+            myfile >> tmp;
+        }
+        for(int i = 0; i < 30; i++)
+        {
+            TerminatorFile >> indexCal_array1[i] >> indexCal_array2[i] >> indexCal_array3[i] >> indexCal_array4[i]
+            >>  indexCal_array5[i] >> indexCal_array6[i] >> indexCal_array7[i] >> indexCal_array8[i];
+        }
+        for (int i = 0; i < 2; i++)
+        {
+            myfile >> tmp;
+        }
+        for(int i = 60; i < 90; i++)
+        {
+            TerminatorFile >> restCal_array1[i] >>restCal_array2[i] >> restCal_array3[i] >> restCal_array4[i]
+            >> restCal_array5[i] >> restCal_array6[i] >> restCal_array7[i] >> restCal_array8[i];
+        }
+        for (int i = 0; i < 2; i++)
+        {
+            myfile >> tmp;
+        }
+        for(int i = 0; i < 30; i++)
+        {
+            TerminatorFile >> middleCal_array1[i] >> middleCal_array2[i] >> middleCal_array3[i] >> middleCal_array4[i]
+            >>  middleCal_array5[i] >> middleCal_array6[i] >> middleCal_array7[i] >> middleCal_array8[i];
+        }
+        for (int i = 0; i < 2; i++)
+        {
+            myfile >> tmp;
+        }
+        for(int i = 90; i < 120; i++)
+        {
+            TerminatorFile >> restCal_array1[i] >>restCal_array2[i] >> restCal_array3[i] >> restCal_array4[i]
+            >> restCal_array5[i] >> restCal_array6[i] >> restCal_array7[i] >> restCal_array8[i];
+        }
+        for (int i = 0; i < 2; i++)
+        {
+            myfile >> tmp;
+        }
+        for(int i = 0; i < 30; i++)
+        {
+            TerminatorFile >> ringCal_array1[i] >> ringCal_array2[i] >> ringCal_array3[i] >> ringCal_array4[i]
+            >>  ringCal_array5[i] >> ringCal_array6[i] >> ringCal_array7[i] >> ringCal_array8[i];
+        }
+        for (int i = 0; i < 2; i++)
+        {
+            myfile >> tmp;
+        }
+        for(int i = 120; i < 150; i++)
+        {
+            TerminatorFile >> restCal_array1[i] >>restCal_array2[i] >> restCal_array3[i] >> restCal_array4[i]
+            >> restCal_array5[i] >> restCal_array6[i] >> restCal_array7[i] >> restCal_array8[i];
+        }
+        for (int i = 0; i < 2; i++)
+        {
+            myfile >> tmp;
+        }
+        for(int i = 0; i < 30; i++)
+        {
+            TerminatorFile >> pinkyCal_array1[i] >>pinkyCal_array2[i] >> pinkyCal_array3[i] >> pinkyCal_array4[i]
+            >> pinkyCal_array5[i] >> pinkyCal_array6[i] >> pinkyCal_array7[i] >> pinkyCal_array8[i];
+        }
+        for (int i = 0; i < 2; i++)
+        {
+            myfile >> tmp;
+        }
+        for(int i = 150; i < 180; i++)
+        {
+            TerminatorFile >> restCal_array1[i] >>restCal_array2[i] >> restCal_array3[i] >> restCal_array4[i]
+            >> restCal_array5[i] >> restCal_array6[i] >> restCal_array7[i] >> restCal_array8[i];
+        }
+        for (int i = 0; i < 2; i++)
+        {
+            myfile >> tmp;
+        }
+        for(int i = 0; i < 30; i++)
+        {
+            TerminatorFile >> handCal_array1[i] >>handCal_array2[i] >> handCal_array3[i] >> handCal_array4[i]
+            >> handCal_array5[i] >> handCal_array6[i] >> handCal_array7[i] >> handCal_array8[i];
+        }
+        
+        // Calculate Standard Deviation for each Pod on rest
+        
+        double sumrest = 0;
+        for(int i = 0; i < 180; i++)
+        {
+            sumrest += restCal_array1[i];
+        }
+        double meanrest = sumrest/180;
+        double temprest = 0;
+        for(int i = 0; i < 180; i++)
+        {
+            temprest += (restCal_array1[i] - meanrest) * (restCal_array1[i] - meanrest);
+        }
+        double sdevrest = sqrt(temprest / 180);
+        restCalIN_array[0] = sdevrest;
+        
+        sumrest = 0
+        temprest = 0
+        for(int i = 0; i < 180; i++)
+        {
+            sumrest += restCal_array2[i];
+        }
+        meanrest = sumrest/180;
+        for(int i = 0; i < 180; i++)
+        {
+            temprest += (restCal_array2[i] - meanrest) * (restCal_array2[i] - meanrest);
+        }
+        sdevrest = sqrt(temprest / 180);
+        restCalIN_array[1] = sdevrest;
+        
+        sumrest = 0
+        temprest = 0
+        for(int i = 0; i < 180; i++)
+        {
+            sumrest += restCal_array3[i];
+        }
+        meanrest = sumrest/180;
+        for(int i = 0; i < 180; i++)
+        {
+            temprest += (restCal_array3[i] - meanrest) * (restCal_array3[i] - meanrest);
+        }
+        sdevrest = sqrt(temprest / 180);
+        restCalIN_array[2] = sdevrest;
+        
+        sumrest = 0
+        temprest = 0
+        for(int i = 0; i < 180; i++)
+        {
+            sumrest += restCal_array4[i];
+        }
+        meanrest = sumrest/180;
+        for(int i = 0; i < 180; i++)
+        {
+            temprest += (restCal_array4[i] - meanrest) * (restCal_array4[i] - meanrest);
+        }
+        sdevrest = sqrt(temprest / 180);
+        restCalIN_array[3] = sdevrest;
+        
+        sumrest = 0
+        temprest = 0
+        for(int i = 0; i < 180; i++)
+        {
+            sumrest += restCal_array5[i];
+        }
+        meanrest = sumrest/180;
+        for(int i = 0; i < 180; i++)
+        {
+            temprest += (restCal_array5[i] - meanrest) * (restCal_array5[i] - meanrest);
+        }
+        sdevrest = sqrt(temprest / 180);
+        restCalIN_array[4] = sdevrest;
+        
+        sumrest = 0
+        temprest = 0
+        for(int i = 0; i < 180; i++)
+        {
+            sumrest += restCal_array6[i];
+        }
+        meanrest = sumrest/180;
+        for(int i = 0; i < 180; i++)
+        {
+            temprest += (restCal_array6[i] - meanrest) * (restCal_array6[i] - meanrest);
+        }
+        sdevrest = sqrt(temprest / 180);
+        restCalIN_array[5] = sdevrest;
+        
+        sumrest = 0
+        temprest = 0
+        for(int i = 0; i < 180; i++)
+        {
+            sumrest += restCal_array7[i];
+        }
+        meanrest = sumrest/180;
+        for(int i = 0; i < 180; i++)
+        {
+            temprest += (restCal_array7[i] - meanrest) * (restCal_array7[i] - meanrest);
+        }
+        sdevrest = sqrt(temprest / 180);
+        restCalIN_array[6] = sdevrest;
+        
+        sumrest = 0
+        temprest = 0
+        for(int i = 0; i < 180; i++)
+        {
+            sumrest += restCal_array8[i];
+        }
+        meanrest = sumrest/180;
+        for(int i = 0; i < 180; i++)
+        {
+            temprest += (restCal_array8[i] - meanrest) * (restCal_array8[i] - meanrest);
+        }
+        sdevrest = sqrt(temprest / 180);
+        restCalIN_array[7] = sdevrest;
+        
+        // Calculate Standard Deviation for each Pod on thumb
+        
+        double sumthumb = 0;
+        for(int i = 0; i < 30; i++)
+        {
+            sumthumb += thumbCal_array1[i];
+        }
+        double meanthumb = sumthumb/30;
+        double tempthumb = 0;
+        for(int i = 0; i < 30; i++)
+        {
+            tempthumb += (thumbCal_array1[i] - meanthumb) * (thumbCal_array1[i] - meanthumb);
+        }
+        double sdevthumb = sqrt(tempthumb / 30);
+        thumbCalIN_array[0] = sdevthumb;
+        
+        sumthumb = 0
+        tempthumb = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumthumb += thumbCal_array2[i];
+        }
+        meanthumb = sumthumb/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempthumb += (thumbCal_array2[i] - meanthumb) * (thumbCal_array2[i] - meanthumb);
+        }
+        sdevthumb = sqrt(tempthumb / 30);
+        thumbCalIN_array[1] = sdevthumb;
+        
+        sumthumb = 0
+        tempthumb = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumthumb += thumbCal_array3[i];
+        }
+        meanthumb = sumthumb/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempthumb += (thumbCal_array3[i] - meanthumb) * (thumbCal_array3[i] - meanthumb);
+        }
+        sdevthumb = sqrt(tempthumb / 30);
+        thumbCalIN_array[2] = sdevthumb;
+        
+        sumthumb = 0
+        tempthumb = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumthumb += thumbCal_array4[i];
+        }
+        meanthumb = sumthumb/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempthumb += (thumbCal_array4[i] - meanthumb) * (thumb Cal_array4[i] - meanthumb);
+        }
+        sdevthumb = sqrt(tempthumb / 30);
+        thumbCalIN_array[3] = sdevthumb;
+        
+        sumthumb = 0
+        tempthumb = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumthumb += thumbCal_array5[i];
+        }
+        meanthumb = sumthumb/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempthumb += (thumbCal_array5[i] - meanthumb) * (thumbCal_array5[i] - meanthumb);
+        }
+        sdevthumb = sqrt(tempthumb / 30);
+        thumbCalIN_array[4] = sdevthumb;
+        
+        sumthumb = 0
+        tempthumb = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumthumb += thumbCal_array6[i];
+        }
+        meanthumb = sumthumb/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempthumb += (thumbCal_array6[i] - meanthumb) * (thumbCal_array6[i] - meanthumb);
+        }
+        sdevthumb = sqrt(tempthumb / 30);
+        thumbCalIN_array[5] = sdevthumb;
+        
+        sumthumb = 0
+        tempthumb = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumthumb += thumbCal_array7[i];
+        }
+        meanthumb = sumthumb/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempthumb += (thumbCal_array7[i] - meanthumb) * (thumbCal_array7[i] - meanthumb);
+        }
+        sdevthumb = sqrt(tempthumb / 30);
+        thumbCalIN_array[6] = sdevthumb;
+        
+        sumthumb = 0
+        tempthumb = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumthumb += thumbCal_array8[i];
+        }
+        meanthumb = sumthumb/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempthumb += (thumbCal_array8[i] - meanthumb) * (thumbCal_array8[i] - meanthumb);
+        }
+        sdevthumb = sqrt(tempthumb / 30);
+        thumbCalIN_array[7] = sdevthumb;
+        
+        // Calculate Standard Deviation for each Pod on index
+        
+        double sumindex = 0;
+        for(int i = 0; i < 30; i++)
+        {
+            sumindex += indexCal_array1[i];
+        }
+        double meanindex = sumindex/30;
+        double tempindex = 0;
+        for(int i = 0; i < 30; i++)
+        {
+            tempindex += (indexCal_array1[i] - meanindex) * (indexCal_array1[i] - meanindex);
+        }
+        double sdevindex = sqrt(tempindex / 30);
+        indexCalIN_array[0] = sdevindex;
+        
+        sumindex = 0
+        tempindex = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumindex += indexCal_array2[i];
+        }
+        meanindex = sumindex/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempindex += (indexCal_array2[i] - meanindex) * (indexCal_array2[i] - meanindex);
+        }
+        sdevindex = sqrt(tempindex / 30);
+        indexCalIN_array[1] = sdevindex;
+        
+        sumindex = 0
+        tempindex = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumindex += indexCal_array3[i];
+        }
+        meanindex = sumindex/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempindex += (indexCal_array3[i] - meanindex) * (indexCal_array3[i] - meanindex);
+        }
+        sdevindex = sqrt(tempindex / 30);
+        indexCalIN_array[2] = sdevindex;
+        
+        sumindex = 0
+        tempindex = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumindex += indexCal_array4[i];
+        }
+        meanindex = sumindex/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempindex += (indexCal_array4[i] - meanindex) * (index Cal_array4[i] - meanindex);
+        }
+        sdevindex = sqrt(tempindex / 30);
+        indexCalIN_array[3] = sdevindex;
+        
+        sumindex = 0
+        tempindex = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumindex += indexCal_array5[i];
+        }
+        meanindex = sumindex/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempindex += (indexCal_array5[i] - meanindex) * (indexCal_array5[i] - meanindex);
+        }
+        sdevindex = sqrt(tempindex / 30);
+        indexCalIN_array[4] = sdevindex;
+        
+        sumindex = 0
+        tempindex = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumindex += indexCal_array6[i];
+        }
+        meanindex = sumindex/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempindex += (indexCal_array6[i] - meanindex) * (indexCal_array6[i] - meanindex);
+        }
+        sdevindex = sqrt(tempindex / 30);
+        indexCalIN_array[5] = sdevindex;
+        
+        sumindex = 0
+        tempindex = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumindex += indexCal_array7[i];
+        }
+        meanindex = sumindex/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempindex += (indexCal_array7[i] - meanindex) * (indexCal_array7[i] - meanindex);
+        }
+        sdevindex = sqrt(tempindex / 30);
+        indexCalIN_array[6] = sdevindex;
+        
+        sumindex = 0
+        tempindex = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumindex += indexCal_array8[i];
+        }
+        meanindex = sumindex/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempindex += (indexCal_array8[i] - meanindex) * (indexCal_array8[i] - meanindex);
+        }
+        sdevindex = sqrt(tempindex / 30);
+        indexCalIN_array[7] = sdevindex;
+        
+        // Calculate Standard Deviation for each Pod on middle
+        
+        double summiddle = 0;
+        for(int i = 0; i < 30; i++)
+        {
+            summiddle += middleCal_array1[i];
+        }
+        double meanmiddle = summiddle/30;
+        double tempmiddle = 0;
+        for(int i = 0; i < 30; i++)
+        {
+            tempmiddle += (middleCal_array1[i] - meanmiddle) * (middleCal_array1[i] - meanmiddle);
+        }
+        double sdevmiddle = sqrt(tempmiddle / 30);
+        middleCalIN_array[0] = sdevmiddle;
+        
+        summiddle = 0
+        tempmiddle = 0
+        for(int i = 0; i < 30; i++)
+        {
+            summiddle += middleCal_array2[i];
+        }
+        meanmiddle = summiddle/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempmiddle += (middleCal_array2[i] - meanmiddle) * (middleCal_array2[i] - meanmiddle);
+        }
+        sdevmiddle = sqrt(tempmiddle / 30);
+        middleCalIN_array[1] = sdevmiddle;
+        
+        summiddle = 0
+        tempmiddle = 0
+        for(int i = 0; i < 30; i++)
+        {
+            summiddle += middleCal_array3[i];
+        }
+        meanmiddle = summiddle/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempmiddle += (middleCal_array3[i] - meanmiddle) * (middleCal_array3[i] - meanmiddle);
+        }
+        sdevmiddle = sqrt(tempmiddle / 30);
+        middleCalIN_array[2] = sdevmiddle;
+        
+        summiddle = 0
+        tempmiddle = 0
+        for(int i = 0; i < 30; i++)
+        {
+            summiddle += middleCal_array4[i];
+        }
+        meanmiddle = summiddle/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempmiddle += (middleCal_array4[i] - meanmiddle) * (middle Cal_array4[i] - meanmiddle);
+        }
+        sdevmiddle = sqrt(tempmiddle / 30);
+        middleCalIN_array[3] = sdevmiddle;
+        
+        summiddle = 0
+        tempmiddle = 0
+        for(int i = 0; i < 30; i++)
+        {
+            summiddle += middleCal_array5[i];
+        }
+        meanmiddle = summiddle/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempmiddle += (middleCal_array5[i] - meanmiddle) * (middleCal_array5[i] - meanmiddle);
+        }
+        sdevmiddle = sqrt(tempmiddle / 30);
+        middleCalIN_array[4] = sdevmiddle;
+        
+        summiddle = 0
+        tempmiddle = 0
+        for(int i = 0; i < 30; i++)
+        {
+            summiddle += middleCal_array6[i];
+        }
+        meanmiddle = summiddle/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempmiddle += (middleCal_array6[i] - meanmiddle) * (middleCal_array6[i] - meanmiddle);
+        }
+        sdevmiddle = sqrt(tempmiddle / 30);
+        middleCalIN_array[5] = sdevmiddle;
+        
+        summiddle = 0
+        tempmiddle = 0
+        for(int i = 0; i < 30; i++)
+        {
+            summiddle += middleCal_array7[i];
+        }
+        meanmiddle = summiddle/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempmiddle += (middleCal_array7[i] - meanmiddle) * (middleCal_array7[i] - meanmiddle);
+        }
+        sdevmiddle = sqrt(tempmiddle / 30);
+        middleCalIN_array[6] = sdevmiddle;
+        
+        summiddle = 0
+        tempmiddle = 0
+        for(int i = 0; i < 30; i++)
+        {
+            summiddle += middleCal_array8[i];
+        }
+        meanmiddle = summiddle/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempmiddle += (middleCal_array8[i] - meanmiddle) * (middleCal_array8[i] - meanmiddle);
+        }
+        sdevmiddle = sqrt(tempmiddle / 30);
+        middleCalIN_array[7] = sdevmiddle;
 
-	// onArmSync() is called whenever HUTerminator Myo recognizes a Sync Gesture after someone has put it on their
-	// arm. This lets Myo know which arm it's on and which way it's facing.
-	void onArmSync(myo::Myo* myo, uint64_t timestamp, myo::Arm arm, myo::XDirection xDirection, float rotation,
-		myo::WarmupState warmupState)
-	{
-		system("cls"); std::cout << "On ARM SYNC CALLED!!" << std::endl;
-		onArm = true;
-		whichArm = arm;
-	}
-	// onArmUnsync() is called whenever HUTerminator Myo has detected that it was moved from a stable position on a person's arm after
-	// it recognized the arm. Typically this happens when someone takes it off of their arm, but it can also happen
-	// when the Myo is moved around on the arm.
-	void onArmUnsync(myo::Myo* myo, uint64_t timestamp)
-	{
-		system("cls"); std::cout << "On ARM UN-SYNC CALLED!!" << std::endl;
-		onArm = false;
-		Sleep(5000);
-	}
-
-	// onUnpair() is called whenever the Myo is disconnected from Myo Connect by the user
-	void onUnpair(myo::Myo* myo, uint64_t timestamp)
-	{
-		// We've lost our Myo.
-		// Zeros are seen in output file if there was a disconnect so test can be repeated
-		emgSamples.fill(0);
-		onArm = false;
-	}
-
-	// onEmgData() is called whenever a paired Myo has provided new EMG data, and EMG streaming is enabled
-	// Classifier output data
-	void onEmgData(myo::Myo* myo, uint64_t timestamp, const int8_t* emg)
-	{
-		for (int i = 0; i < 8; i++) {
-			emgSamples[i] = emg[i];
-		}
-	}
-
-	// The values of this array is set by onEmgData() above
-	std::array<int8_t, 8> emgSamples;
-	bool onArm; myo::Arm whichArm;
-
-	// There are other virtual functions in DeviceListener that we could override here, like onAccelerometerData()
-	// For this application, the functions overridden above are sufficient
-	std::string SerialIndex, update = "gesture";
-	std::ofstream TerminatorFile;
-	std::string filepath = "C:\\Users\\Ayotunde\\Google Drive\\Team Terminator\\Data Analysis\\EMGClassifierData\\TeamTerminatorData";
-	int NewLineflag = 0;
-
-	// We define this function to write the current values that were updated by the on...() functions above
-	void writeData(std::string gesture)
-	{
-		// Create and open dynamic outfile 
-		std::string filename = filepath + SerialIndex + ".txt";
-		TerminatorFile.open(filename, std::ofstream::app);
-
-		// Write current gesture to outfile
-		if (update != gesture){
-			TerminatorFile << "\n" << gesture << "\n"; update = gesture;
-		}
-
-		// Clear the current line
-		std::cout << '\r';
-		// write out the EMG classifier data
-		for (size_t i = 0; i < emgSamples.size(); i++) {
-			std::ostringstream oss;
-			oss << static_cast<int>(emgSamples[i]);        // convert 8-bit array into int
-			std::string emgString = oss.str();
-
-			if (NewLineflag == 1){
-				TerminatorFile << "\n";
-				NewLineflag = 0;
-			}
-
-			// Write to outfile
-			TerminatorFile << emgString << " ";
-		}
-		NewLineflag = 1;
-		std::cout << std::flush;
-		TerminatorFile.close();       // flush buffer to outfile
-	}
-
-	// We define this function to calibrate our logged data
-	void calibrateData(){
-			system("cls"); std::cout << "\t\t Calibrating logged Data..." << std::endl;
-			// Data calibration approach/algorithm goes here
-			std::cout << "\t\t Calibration complete!" << std::endl;
-	}
-
-	// We define this function for gesture recognition with calibration results as long as HUTerminator Myo is worn
-	void listenforGesture(){
-		while (onArm){
-			system("cls");
-			std::cout << "Terminator Myo is still on arm!" << std::endl;
-
-			// Real-time gesture-recognition goes here 
-		} 
-	}
-
-	void holdState()
-	{
-		while (!onArm){}
-	}
+        // Calculate Standard Deviation for each Pod on ring
+        
+        double sumring = 0;
+        for(int i = 0; i < 30; i++)
+        {
+            sumring += ringCal_array1[i];
+        }
+        double meanring = sumring/30;
+        double tempring = 0;
+        for(int i = 0; i < 30; i++)
+        {
+            tempring += (ringCal_array1[i] - meanring) * (ringCal_array1[i] - meanring);
+        }
+        double sdevring = sqrt(tempring / 30);
+        ringCalIN_array[0] = sdevring;
+        
+        sumring = 0
+        tempring = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumring += ringCal_array2[i];
+        }
+        meanring = sumring/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempring += (ringCal_array2[i] - meanring) * (ringCal_array2[i] - meanring);
+        }
+        sdevring = sqrt(tempring / 30);
+        ringCalIN_array[1] = sdevring;
+        
+        sumring = 0
+        tempring = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumring += ringCal_array3[i];
+        }
+        meanring = sumring/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempring += (ringCal_array3[i] - meanring) * (ringCal_array3[i] - meanring);
+        }
+        sdevring = sqrt(tempring / 30);
+        ringCalIN_array[2] = sdevring;
+        
+        sumring = 0
+        tempring = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumring += ringCal_array4[i];
+        }
+        meanring = sumring/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempring += (ringCal_array4[i] - meanring) * (ring Cal_array4[i] - meanring);
+        }
+        sdevring = sqrt(tempring / 30);
+        ringCalIN_array[3] = sdevring;
+        
+        sumring = 0
+        tempring = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumring += ringCal_array5[i];
+        }
+        meanring = sumring/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempring += (ringCal_array5[i] - meanring) * (ringCal_array5[i] - meanring);
+        }
+        sdevring = sqrt(tempring / 30);
+        ringCalIN_array[4] = sdevring;
+        
+        sumring = 0
+        tempring = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumring += ringCal_array6[i];
+        }
+        meanring = sumring/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempring += (ringCal_array6[i] - meanring) * (ringCal_array6[i] - meanring);
+        }
+        sdevring = sqrt(tempring / 30);
+        ringCalIN_array[5] = sdevring;
+        
+        sumring = 0
+        tempring = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumring += ringCal_array7[i];
+        }
+        meanring = sumring/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempring += (ringCal_array7[i] - meanring) * (ringCal_array7[i] - meanring);
+        }
+        sdevring = sqrt(tempring / 30);
+        ringCalIN_array[6] = sdevring;
+        
+        sumring = 0
+        tempring = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumring += ringCal_array8[i];
+        }
+        meanring = sumring/30;
+        for(int i = 0; i < 30; i++)
+        {
+            tempring += (ringCal_array8[i] - meanring) * (ringCal_array8[i] - meanring);
+        }
+        sdevring = sqrt(tempring / 30);
+        ringCalIN_array[7] = sdevring;
+        
+        // Calculate Standard Deviation for each Pod on pinky
+        
+        double sumpinky = 0;
+        for(int i = 0; i < 30; i++)
+        {
+            sumpinky += pinkyCal_array1[i];
+        }
+        double meanpinky = sumpinky/30;
+        double temppinky = 0;
+        for(int i = 0; i < 30; i++)
+        {
+            temppinky += (pinkyCal_array1[i] - meanpinky) * (pinkyCal_array1[i] - meanpinky);
+        }
+        double sdevpinky = sqrt(temppinky / 30);
+        pinkyCalIN_array[0] = sdevpinky;
+        
+        sumpinky = 0
+        temppinky = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumpinky += pinkyCal_array2[i];
+        }
+        meanpinky = sumpinky/30;
+        for(int i = 0; i < 30; i++)
+        {
+            temppinky += (pinkyCal_array2[i] - meanpinky) * (pinkyCal_array2[i] - meanpinky);
+        }
+        sdevpinky = sqrt(temppinky / 30);
+        pinkyCalIN_array[1] = sdevpinky;
+        
+        sumpinky = 0
+        temppinky = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumpinky += pinkyCal_array3[i];
+        }
+        meanpinky = sumpinky/30;
+        for(int i = 0; i < 30; i++)
+        {
+            temppinky += (pinkyCal_array3[i] - meanpinky) * (pinkyCal_array3[i] - meanpinky);
+        }
+        sdevpinky = sqrt(temppinky / 30);
+        pinkyCalIN_array[2] = sdevpinky;
+        
+        sumpinky = 0
+        temppinky = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumpinky += pinkyCal_array4[i];
+        }
+        meanpinky = sumpinky/30;
+        for(int i = 0; i < 30; i++)
+        {
+            temppinky += (pinkyCal_array4[i] - meanpinky) * (pinky Cal_array4[i] - meanpinky);
+        }
+        sdevpinky = sqrt(temppinky / 30);
+        pinkyCalIN_array[3] = sdevpinky;
+        
+        sumpinky = 0
+        temppinky = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumpinky += pinkyCal_array5[i];
+        }
+        meanpinky = sumpinky/30;
+        for(int i = 0; i < 30; i++)
+        {
+            temppinky += (pinkyCal_array5[i] - meanpinky) * (pinkyCal_array5[i] - meanpinky);
+        }
+        sdevpinky = sqrt(temppinky / 30);
+        pinkyCalIN_array[4] = sdevpinky;
+        
+        sumpinky = 0
+        temppinky = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumpinky += pinkyCal_array6[i];
+        }
+        meanpinky = sumpinky/30;
+        for(int i = 0; i < 30; i++)
+        {
+            temppinky += (pinkyCal_array6[i] - meanpinky) * (pinkyCal_array6[i] - meanpinky);
+        }
+        sdevpinky = sqrt(temppinky / 30);
+        pinkyCalIN_array[5] = sdevpinky;
+        
+        sumpinky = 0
+        temppinky = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumpinky += pinkyCal_array7[i];
+        }
+        meanpinky = sumpinky/30;
+        for(int i = 0; i < 30; i++)
+        {
+            temppinky += (pinkyCal_array7[i] - meanpinky) * (pinkyCal_array7[i] - meanpinky);
+        }
+        sdevpinky = sqrt(temppinky / 30);
+        pinkyCalIN_array[6] = sdevpinky;
+        
+        sumpinky = 0
+        temppinky = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumpinky += pinkyCal_array8[i];
+        }
+        meanpinky = sumpinky/30;
+        for(int i = 0; i < 30; i++)
+        {
+            temppinky += (pinkyCal_array8[i] - meanpinky) * (pinkyCal_array8[i] - meanpinky);
+        }
+        sdevpinky = sqrt(temppinky / 30);
+        pinkyCalIN_array[7] = sdevpinky;
+        
+        // Calculate Standard Deviation for each Pod on hand
+        
+        double sumhand = 0;
+        for(int i = 0; i < 30; i++)
+        {
+            sumhand += handCal_array1[i];
+        }
+        double meanhand = sumhand/30;
+        double temphand = 0;
+        for(int i = 0; i < 30; i++)
+        {
+            temphand += (handCal_array1[i] - meanhand) * (handCal_array1[i] - meanhand);
+        }
+        double sdevhand = sqrt(temphand / 30);
+        handCalIN_array[0] = sdevhand;
+        
+        sumhand = 0
+        temphand = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumhand += handCal_array2[i];
+        }
+        meanhand = sumhand/30;
+        for(int i = 0; i < 30; i++)
+        {
+            temphand += (handCal_array2[i] - meanhand) * (handCal_array2[i] - meanhand);
+        }
+        sdevhand = sqrt(temphand / 30);
+        handCalIN_array[1] = sdevhand;
+        
+        sumhand = 0
+        temphand = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumhand += handCal_array3[i];
+        }
+        meanhand = sumhand/30;
+        for(int i = 0; i < 30; i++)
+        {
+            temphand += (handCal_array3[i] - meanhand) * (handCal_array3[i] - meanhand);
+        }
+        sdevhand = sqrt(temphand / 30);
+        handCalIN_array[2] = sdevhand;
+        
+        sumhand = 0
+        temphand = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumhand += handCal_array4[i];
+        }
+        meanhand = sumhand/30;
+        for(int i = 0; i < 30; i++)
+        {
+            temphand += (handCal_array4[i] - meanhand) * (hand Cal_array4[i] - meanhand);
+        }
+        sdevhand = sqrt(temphand / 30);
+        handCalIN_array[3] = sdevhand;
+        
+        sumhand = 0
+        temphand = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumhand += handCal_array5[i];
+        }
+        meanhand = sumhand/30;
+        for(int i = 0; i < 30; i++)
+        {
+            temphand += (handCal_array5[i] - meanhand) * (handCal_array5[i] - meanhand);
+        }
+        sdevhand = sqrt(temphand / 30);
+        handCalIN_array[4] = sdevhand;
+        
+        sumhand = 0
+        temphand = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumhand += handCal_array6[i];
+        }
+        meanhand = sumhand/30;
+        for(int i = 0; i < 30; i++)
+        {
+            temphand += (handCal_array6[i] - meanhand) * (handCal_array6[i] - meanhand);
+        }
+        sdevhand = sqrt(temphand / 30);
+        handCalIN_array[5] = sdevhand;
+        
+        sumhand = 0
+        temphand = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumhand += handCal_array7[i];
+        }
+        meanhand = sumhand/30;
+        for(int i = 0; i < 30; i++)
+        {
+            temphand += (handCal_array7[i] - meanhand) * (handCal_array7[i] - meanhand);
+        }
+        sdevhand = sqrt(temphand / 30);
+        handCalIN_array[6] = sdevhand;
+        
+        sumhand = 0
+        temphand = 0
+        for(int i = 0; i < 30; i++)
+        {
+            sumhand += handCal_array8[i];
+        }
+        meanhand = sumhand/30;
+        for(int i = 0; i < 30; i++)
+        {
+            temphand += (handCal_array8[i] - meanhand) * (handCal_array8[i] - meanhand);
+        }
+        sdevhand = sqrt(temphand / 30);
+        handCalIN_array[7] = sdevhand;
+        
+        
+        std::cout << "\t\t Calibration complete!" << std::endl;
+        
+    
+    // We define this function for gesture recognition with calibration results as long as HUTerminator Myo is worn
+    void listenforGesture(){
+        while (onArm){
+            system("cls");
+            std::cout << "Terminator Myo is still on arm!" << std::endl;
+            
+            // Real-time gesture-recognition goes here
+        }
+    }
+    
+    void holdState()
+    {
+        while (!onArm){}
+    }
 };
 
 
 int main(int argc, char** argv)
 {
-	// Declare & open infile 
-	std::ifstream Serialfile;
-	Serialfile.open("Infile.txt");
-
-	// Define test gestures
-	std::string gestures[12] = { "*REST/RELAX* position", "*(THUMB)* contraction", "*REST/RELAX* position", "*(INDEX fing.)* contraction", "*REST/RELAX* position",
-		"*(MIDDLE fing.)* contraction", "*REST/RELAX* position", "*(RING fing.)* contraction", "*REST/RELAX* position",
-		"*(PINKY fing.)* contraction", "*REST/RELAX* position", "*(HAND)* contraction" };
-
-	// We catch any exceptions that might occur below -- see the catch statement for more details
-	try {
-		// First, we create a Hub without any application identifier (I deemed it unnecessary), the Hub provides access to one or more Myos
-		myo::Hub hub("");
-
-		std::cout << "\t\t Attempting to find HU Terminator Myo..." << std::endl;
-
-		// Next, we attempt to find a Myo to use. If a Myo is already paired in Myo Connect, this will return that Myo immediately
-		// waitForMyo() takes a timeout value in milliseconds. We try to find Terminator Myo for 10 seconds, and
-		// if that fails, the function will return a null pointer
-		myo::Myo* myo = hub.waitForMyo(0); //  Times-out until Terminator Myo is found!
-
-		///////////////////////// To-do: CONNECT TERMINATOR MYO BY MAC ADDRESS AND KEEP UNLOCKED //////////////////////////////////////////////////////
-		hub.setLockingPolicy(hub.lockingPolicyNone);      // Keep Terminator Myo unlocked
-		//Hub::a               attachByMacAddress(String macAddress)
-		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-		// If waitForMyo() returned a null pointer, we failed to find our Myo, so exit with an error message
-		if (!myo) {
-			throw std::runtime_error("\t\t Unable to find HU Terminator Myo! \nCheck MyoConnect!");
-		}
-
-		// We've found our Myo!
-		std::cout << "\t\t  Connected to HU Terminator Myo!" << std::endl << std::endl;
-
-		// Next we enable EMG streaming on the found Myo
-		myo->setStreamEmg(myo::Myo::streamEmgEnabled);
-		myo->unlockHold;
-
-		// Next we construct an instance of our DeviceListener, so that we can register it with the Hub
-		DataCollector collector;
-
-		// Grab index of subject for file-writing purposes
-		while (!Serialfile.eof())
-			Serialfile >> collector.SerialIndex;
-
-		// Hub::addListener() takes the address of any object whose class inherits from DeviceListener, and will cause
-		// Hub::run() to send events to all registered device listeners
-		hub.addListener(&collector);
-
-		// Set console font parameters (Make easier to follow instructions)
-		CONSOLE_FONT_INFOEX cfi;
-		cfi.cbSize = sizeof cfi;
-		cfi.nFont = 0;
-		cfi.dwFontSize.X = 0;
-		cfi.dwFontSize.Y = 16;
-		cfi.FontFamily = FF_DONTCARE;
-		cfi.FontWeight = FW_NORMAL;
-		wcscpy_s(cfi.FaceName, L"Consolas");
-		SetCurrentConsoleFontEx(GetStdHandle(STD_OUTPUT_HANDLE), FALSE, &cfi);
-		
-     // Recalibrate:
-		std::cout << "\tPlease follow the instructions to perform CALIBRATION!" << std::endl;
-		std::cout << "\t Allow a couple seconds while Terminator Myo warms up to arm... " << std::endl << std::endl;
-		Sleep(5000);             // suspend execution of current/active thread for time-argument
-
-		// Finally we enter our main loop.
-		for (int i = 0; i < sizeof(gestures) / sizeof(*gestures); i++){
-			system("cls");
-			std::cout << std::endl; std::cout << "\n\n\n \t\t Perform:  " << gestures[i] << " for (5) secs" << std::endl;
-
-			// Get current CPU time
-			double startTime = GetTickCount();
-			double currentTime = 0;
-
-			while ((GetTickCount() - startTime) <= 1000) {}; // wait for 1 extra sec for user change
-			// Record data for 3 seconds
-			while (currentTime <= 3000)
-			{
-				// In each iteration of our main loop, we run the Myo event loop for a set number of milliseconds
-				// In this case, we wish to update our display 50 times a second. (Myo provides EMG at 200Hz and IMU data at 50Hz and is unaffected by display rates)
-				hub.run(1);
-				//hub.runOnce();
-				//std::cout << "HUB running!" << std::endl;
-				// After processing events, we call the writeData() function to write new data to our outfile
-				collector.writeData(gestures[i]);
-				//std::cout << "Written data!" << std::endl;
-				// Update time for iteration purposes
-				currentTime = GetTickCount() - startTime;
-			}
-			while ((GetTickCount() - startTime) <= 5000) {}; // wait for 1 extra sec for user change
-		}
-
-		// Data succesfully logged, start Calibration!
-		system("cls");
-		std::cout << "\n\n\n \t\t Now calibrating data..." << std::endl;
-		collector.calibrateData(); // Get general code working(User exceptions, sync test), use FANN/ openNN http://opennn.cimne.com/ , explore tics.
-
-		// Calibration complete! listen for gestures for as long as HUTerminator myo remains synced with arm
-		system("cls");
-		std::cout << "\n\n\n \t\t Now listening for gestures..." << std::endl;
-		collector.listenforGesture();
-
-		// Ask to re-calibrate, when re-connected to arm by same or subsequent user
-		system("cls");
-		std::cout << "\n\n\n \t\t Please re-calibrate Terminator Myo for best results!" << std::endl;
-		collector.holdState();
-		//goto Recalibrate;
-
-		// Tidy up & End program
-		//Exit:
-		/*std::cout << "Saving Data... " << std::endl;
-		system("cls");
-		std::cout << "\n       *****  Thank you for helping out HU Team Terminator!  *****\n\n";
-		std::cout << "                           From Ayo & Mark!           \n\n";
-		Sleep(3000);
-		return 0;*/
-
-	}
-	catch (const std::exception& e) {
-		std::cerr << "Error: " << e.what() << std::endl;
-		std::cerr << "Press enter to continue.";
-		std::cin.ignore();
-		return 1;
-	}
+    // Declare & open infile
+    std::ifstream Serialfile;
+    Serialfile.open("Infile.txt");
+    
+    // Define test gestures
+    std::string gestures[12] = { "*REST/RELAX* position", "*(THUMB)* contraction", "*REST/RELAX* position", "*(INDEX fing.)* contraction", "*REST/RELAX* position",
+        "*(MIDDLE fing.)* contraction", "*REST/RELAX* position", "*(RING fing.)* contraction", "*REST/RELAX* position",
+        "*(PINKY fing.)* contraction", "*REST/RELAX* position", "*(HAND)* contraction" };
+    
+    // We catch any exceptions that might occur below -- see the catch statement for more details
+    try {
+        // First, we create a Hub without any application identifier (I deemed it unnecessary), the Hub provides access to one or more Myos
+        myo::Hub hub("");
+        
+        std::cout << "\t\t Attempting to find HU Terminator Myo..." << std::endl;
+        
+        // Next, we attempt to find a Myo to use. If a Myo is already paired in Myo Connect, this will return that Myo immediately
+        // waitForMyo() takes a timeout value in milliseconds. We try to find Terminator Myo for 10 seconds, and
+        // if that fails, the function will return a null pointer
+        myo::Myo* myo = hub.waitForMyo(0); //  Times-out until Terminator Myo is found!
+        
+        ///////////////////////// To-do: CONNECT TERMINATOR MYO BY MAC ADDRESS AND KEEP UNLOCKED //////////////////////////////////////////////////////
+        hub.setLockingPolicy(hub.lockingPolicyNone);      // Keep Terminator Myo unlocked
+        //Hub::a               attachByMacAddress(String macAddress)
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        
+        // If waitForMyo() returned a null pointer, we failed to find our Myo, so exit with an error message
+        if (!myo) {
+            throw std::runtime_error("\t\t Unable to find HU Terminator Myo! \nCheck MyoConnect!");
+        }
+        
+        // We've found our Myo!
+        std::cout << "\t\t  Connected to HU Terminator Myo!" << std::endl << std::endl;
+        
+        // Next we enable EMG streaming on the found Myo
+        myo->setStreamEmg(myo::Myo::streamEmgEnabled);
+        myo->unlockHold;
+        
+        // Next we construct an instance of our DeviceListener, so that we can register it with the Hub
+        DataCollector collector;
+        
+        // Grab index of subject for file-writing purposes
+        while (!Serialfile.eof())
+            Serialfile >> collector.SerialIndex;
+        
+        // Hub::addListener() takes the address of any object whose class inherits from DeviceListener, and will cause
+        // Hub::run() to send events to all registered device listeners
+        hub.addListener(&collector);
+        
+        // Set console font parameters (Make easier to follow instructions)
+        CONSOLE_FONT_INFOEX cfi;
+        cfi.cbSize = sizeof cfi;
+        cfi.nFont = 0;
+        cfi.dwFontSize.X = 0;
+        cfi.dwFontSize.Y = 16;
+        cfi.FontFamily = FF_DONTCARE;
+        cfi.FontWeight = FW_NORMAL;
+        wcscpy_s(cfi.FaceName, L"Consolas");
+        SetCurrentConsoleFontEx(GetStdHandle(STD_OUTPUT_HANDLE), FALSE, &cfi);
+        
+        // Recalibrate:
+        std::cout << "\tPlease follow the instructions to perform CALIBRATION!" << std::endl;
+        std::cout << "\t Allow a couple seconds while Terminator Myo warms up to arm... " << std::endl << std::endl;
+        Sleep(5000);             // suspend execution of current/active thread for time-argument
+        
+        // Finally we enter our main loop.
+        for (int i = 0; i < sizeof(gestures) / sizeof(*gestures); i++){
+            system("cls");
+            std::cout << std::endl; std::cout << "\n\n\n \t\t Perform:  " << gestures[i] << " for (5) secs" << std::endl;
+            
+            // Get current CPU time
+            double startTime = GetTickCount();
+            double currentTime = 0;
+            
+            while ((GetTickCount() - startTime) <= 1000) {}; // wait for 1 extra sec for user change
+            // Record data for 3 seconds
+            while (currentTime <= 3000)
+            {
+                // In each iteration of our main loop, we run the Myo event loop for a set number of milliseconds
+                // In this case, we wish to update our display 50 times a second. (Myo provides EMG at 200Hz and IMU data at 50Hz and is unaffected by display rates)
+                hub.run(1);
+                //hub.runOnce();
+                //std::cout << "HUB running!" << std::endl;
+                // After processing events, we call the writeData() function to write new data to our outfile
+                collector.writeData(gestures[i]);
+                //std::cout << "Written data!" << std::endl;
+                // Update time for iteration purposes
+                currentTime = GetTickCount() - startTime;
+            }
+            while ((GetTickCount() - startTime) <= 5000) {}; // wait for 1 extra sec for user change
+        }
+        
+        // Data succesfully logged, start Calibration!
+        system("cls");
+        std::cout << "\n\n\n \t\t Now calibrating data..." << std::endl;
+        collector.calibrateData(); // Get general code working(User exceptions, sync test), use FANN/ openNN http://opennn.cimne.com/ , explore tics.
+        
+        // Calibration complete! listen for gestures for as long as HUTerminator myo remains synced with arm
+        system("cls");
+        std::cout << "\n\n\n \t\t Now listening for gestures..." << std::endl;
+        collector.listenforGesture();
+        
+        // Ask to re-calibrate, when re-connected to arm by same or subsequent user
+        system("cls");
+        std::cout << "\n\n\n \t\t Please re-calibrate Terminator Myo for best results!" << std::endl;
+        collector.holdState();
+        //goto Recalibrate;
+        
+        // Tidy up & End program
+        //Exit:
+        /*std::cout << "Saving Data... " << std::endl;
+         system("cls");
+         std::cout << "\n       *****  Thank you for helping out HU Team Terminator!  *****\n\n";
+         std::cout << "                           From Ayo & Mark!           \n\n";
+         Sleep(3000);
+         return 0;*/
+        
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        std::cerr << "Press enter to continue.";
+        std::cin.ignore();
+        return 1;
+    }
 }
+
