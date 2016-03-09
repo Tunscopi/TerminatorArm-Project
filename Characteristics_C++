@@ -3,7 +3,7 @@
 #include <string>
 #include <math.h>
 
-int main()
+int main()//test
 {
 	// Assume this to be a function receiving an array data[240]   i.e an 80-emg x 30-Datalines  array every sec. or so at run-time
 	// To do: Update logic branches. if/else branch of Thumb needs to be completed too!
