@@ -1,5 +1,4 @@
-Arm-Project
-Control for a prosthetic arm.
+            ---- Arm-Project Control for a prosthetic arm ----
 
 UserApp.cpp is the main entry-point of this application.
 
